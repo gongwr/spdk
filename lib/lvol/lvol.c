@@ -526,16 +526,18 @@ spdk_lvs_opts_init(struct spdk_lvs_opts *o)
 {
 	o->cluster_sz = SPDK_LVS_OPTS_CLUSTER_SZ;
 	o->clear_method = LVS_CLEAR_WITH_UNMAP;
+	o->num_md_pages_per_cluster_ratio = 100;
 	memset(o->name, 0, sizeof(o->name));
 }
 
 static void
-setup_lvs_opts(struct spdk_bs_opts *bs_opts, struct spdk_lvs_opts *o)
+setup_lvs_opts(struct spdk_bs_opts *bs_opts, struct spdk_lvs_opts *o, uint32_t total_clusters)
 {
 	assert(o != NULL);
 	lvs_bs_opts_init(bs_opts);
 	bs_opts->cluster_sz = o->cluster_sz;
 	bs_opts->clear_method = (enum bs_clear_method)o->clear_method;
+	bs_opts->num_md_pages = (o->num_md_pages_per_cluster_ratio * total_clusters) / 100;
 }
 
 int
@@ -545,6 +547,7 @@ spdk_lvs_init(struct spdk_bs_dev *bs_dev, struct spdk_lvs_opts *o,
 	struct spdk_lvol_store *lvs;
 	struct spdk_lvs_with_handle_req *lvs_req;
 	struct spdk_bs_opts opts = {};
+	uint32_t total_clusters;
 	int rc;
 
 	if (bs_dev == NULL) {
@@ -557,7 +560,14 @@ spdk_lvs_init(struct spdk_bs_dev *bs_dev, struct spdk_lvs_opts *o,
 		return -EINVAL;
 	}
 
-	setup_lvs_opts(&opts, o);
+	if (o->cluster_sz < bs_dev->blocklen) {
+		SPDK_ERRLOG("Cluster size %" PRIu32 " is smaller than blocklen %" PRIu32 "\n",
+			    opts.cluster_sz, bs_dev->blocklen);
+		return -EINVAL;
+	}
+	total_clusters = bs_dev->blockcnt / (o->cluster_sz / bs_dev->blocklen);
+
+	setup_lvs_opts(&opts, o, total_clusters);
 
 	if (strnlen(o->name, SPDK_LVS_NAME_MAX) == SPDK_LVS_NAME_MAX) {
 		SPDK_ERRLOG("Name has no null terminator.\n");
@@ -1477,4 +1487,35 @@ spdk_lvol_decouple_parent(struct spdk_lvol *lvol, spdk_lvol_op_complete cb_fn, v
 	blob_id = spdk_blob_get_id(lvol->blob);
 	spdk_bs_blob_decouple_parent(lvol->lvol_store->blobstore, req->channel, blob_id,
 				     lvol_inflate_cb, req);
+}
+
+void
+spdk_lvs_grow(struct spdk_bs_dev *bs_dev, spdk_lvs_op_with_handle_complete cb_fn, void *cb_arg)
+{
+	struct spdk_lvs_with_handle_req *req;
+	struct spdk_bs_opts opts = {};
+
+	assert(cb_fn != NULL);
+
+	if (bs_dev == NULL) {
+		SPDK_ERRLOG("Blobstore device does not exist\n");
+		cb_fn(cb_arg, NULL, -ENODEV);
+		return;
+	}
+
+	req = calloc(1, sizeof(*req));
+	if (req == NULL) {
+		SPDK_ERRLOG("Cannot alloc memory for request structure\n");
+		cb_fn(cb_arg, NULL, -ENOMEM);
+		return;
+	}
+
+	req->cb_fn = cb_fn;
+	req->cb_arg = cb_arg;
+	req->bs_dev = bs_dev;
+
+	lvs_bs_opts_init(&opts);
+	snprintf(opts.bstype.bstype, sizeof(opts.bstype.bstype), "LVOLSTORE");
+
+	spdk_bs_grow(bs_dev, &opts, lvs_load_cb, req);
 }

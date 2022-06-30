@@ -26,7 +26,8 @@ struct lvol_bdev {
 };
 
 int vbdev_lvs_create(const char *base_bdev_name, const char *name, uint32_t cluster_sz,
-		     enum lvs_clear_method clear_method, spdk_lvs_op_with_handle_complete cb_fn, void *cb_arg);
+		     enum lvs_clear_method clear_method, uint32_t num_md_pages_per_cluster_ratio,
+		     spdk_lvs_op_with_handle_complete cb_fn, void *cb_arg);
 void vbdev_lvs_destruct(struct spdk_lvol_store *lvs, spdk_lvs_op_complete cb_fn, void *cb_arg);
 void vbdev_lvs_unload(struct spdk_lvol_store *lvs, spdk_lvs_op_complete cb_fn, void *cb_arg);
 
@@ -104,5 +105,15 @@ struct spdk_lvol_store *vbdev_get_lvol_store_by_name(const char *name);
 struct lvol_store_bdev *vbdev_get_lvs_bdev_by_lvs(struct spdk_lvol_store *lvs);
 
 struct spdk_lvol *vbdev_lvol_get_from_bdev(struct spdk_bdev *bdev);
+
+/**
+ * \brief Grow given lvolstore.
+ *
+ * \param lvs Pointer to lvolstore
+ * \param cb_fn Completion callback
+ * \param cb_arg Completion callback custom arguments
+ */
+void vbdev_lvs_grow(struct spdk_lvol_store *lvs,
+		    spdk_lvs_op_complete cb_fn, void *cb_arg);
 
 #endif /* SPDK_VBDEV_LVOL_H */

@@ -7862,12 +7862,27 @@ Construct a logical volume store.
 
 #### Parameters
 
-Name                    | Optional | Type        | Description
------------------------ | -------- | ----------- | -----------
-bdev_name               | Required | string      | Bdev on which to construct logical volume store
-lvs_name                | Required | string      | Name of the logical volume store to create
-cluster_sz              | Optional | number      | Cluster size of the logical volume store in bytes
-clear_method            | Optional | string      | Change clear method for data region. Available: none, unmap (default), write_zeroes
+Name                          | Optional | Type        | Description
+----------------------------- | -------- | ----------- | -----------
+bdev_name                     | Required | string      | Bdev on which to construct logical volume store
+lvs_name                      | Required | string      | Name of the logical volume store to create
+cluster_sz                    | Optional | number      | Cluster size of the logical volume store in bytes (Default: 4MiB)
+clear_method                  | Optional | string      | Change clear method for data region. Available: none, unmap (default), write_zeroes
+num_md_pages_per_cluster_ratio| Optional | number      | Reserved metadata pages per cluster (Default: 100)
+
+The num_md_pages_per_cluster_ratio defines the amount of metadata to
+allocate when the logical volume store is created. The default value
+is '100', which translates to 1 4KiB per cluster. For the default 4MiB
+cluster size, this equates to about 0.1% of the underlying block
+device allocated for metadata. Logical volume stores can be grown, if
+the size of the underlying block device grows in the future, but only
+if enough metadata pages were allocated to support the growth. So
+num_md_pages_per_cluster_ratio should be set to a higher value if
+wanting to support future growth. For example,
+num_md_pages_per_cluster_ratio = 200 would support future 2x growth of
+the logical volume store, and would result in 0.2% of the underlying
+block device allocated for metadata (with a default 4MiB cluster
+size).
 
 #### Response
 
@@ -8010,6 +8025,44 @@ Example request:
   "params": {
     "old_name": "LVS0",
     "new_name": "LVS2"
+  }
+}
+~~~
+
+Example response:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
+}
+~~~
+
+### bdev_lvol_grow_lvstore {#rpc_bdev_lvol_grow_lvstore}
+
+Grow the logical volume store to fill the underlying bdev
+
+#### Parameters
+
+Name                    | Optional | Type        | Description
+----------------------- | -------- | ----------- | -----------
+uuid                    | Optional | string      | UUID of the logical volume store to grow
+lvs_name                | Optional | string      | Name of the logical volume store to grow
+
+Either uuid or lvs_name must be specified, but not both.
+
+#### Example
+
+Example request:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "method": "bdev_lvol_grow_lvstore",
+  "id": 1
+  "params": {
+    "uuid": "a9959197-b5e2-4f2d-8095-251ffb6985a5"
   }
 }
 ~~~

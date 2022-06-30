@@ -45,6 +45,8 @@ struct spdk_lvs_opts {
 	uint32_t		cluster_sz;
 	enum lvs_clear_method	clear_method;
 	char			name[SPDK_LVS_NAME_MAX];
+	/** num_md_pages_per_cluster_ratio = 100 means 1 page per cluster */
+	uint32_t		num_md_pages_per_cluster_ratio;
 };
 
 /**
@@ -235,6 +237,16 @@ struct spdk_io_channel *spdk_lvol_get_io_channel(struct spdk_lvol *lvol);
  * \param cb_arg Completion callback custom arguments.
  */
 void spdk_lvs_load(struct spdk_bs_dev *bs_dev, spdk_lvs_op_with_handle_complete cb_fn,
+		   void *cb_arg);
+
+/**
+ * Grow a lvstore to fill the underlying device
+ *
+ * \param bs_dev Pointer to the blobstore device.
+ * \param cb_fn Completion callback.
+ * \param cb_arg Completion callback custom arguments.
+ */
+void spdk_lvs_grow(struct spdk_bs_dev *bs_dev, spdk_lvs_op_with_handle_complete cb_fn,
 		   void *cb_arg);
 
 /**
